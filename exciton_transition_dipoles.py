@@ -11,7 +11,10 @@ trajectory_list = [t for t in range(0,1000)]
 #active_PDI_list = [6,18,30,42,54,66,78,90,102,114,126,138,150,162,174,186,198,210,222,234]
 active_PDI_list = [6,18,30,42,54,66,78,90,102,114]
 
+recomb = True
+
 number_diabats = 61
+number_excitons = 10
 neutral_geometry_energies = np.loadtxt('total_neutral_energies.txt')
 
 transition_dipole_array = np.zeros((2, number_diabats*len(trajectory_list) ))
@@ -50,27 +53,25 @@ for trajectory in trajectory_list:
     non_covalent_energy = xsh_energy - initial_state_energy
     #extra total potential energy due to non-covalent interactions between molecules
 
-    CT_energy = 0.086424
+    CT_energy = 0 #0.086424 for 6T-PDI junction with no explicit neutral GS
     XT_non_eq_energy = 0.00733874
     CT_non_eq_energy = 0.008690
 
     #shifting all site energies upwards by iCT excitation energy (CT_energy) obtained from TD-DFT and diabatisation of 6T-PDI dimer.
     #subtracting energy of neutral GS in same configuration since we want diabatic XT energies to equal the PDI S1 energy in vacuum.
     #non_covalent_energy subtracted from neutral bc it's not included in site energies but is included in total neutral energies.
+
     for index in range(len(H)):
-        if index <= 400:
-            H[index,index] = H[index,index] - (neutral_energy - non_covalent_energy) + CT_energy # - CT_non_eq_energy
-        else:
-            H[index,index] = H[index,index] - (neutral_energy - non_covalent_energy) + CT_energy # - XT_non_eq_energy
+        H[index,index] = H[index,index] - (neutral_energy - non_covalent_energy) + CT_energy # - CT_non_eq_energy
 
     #The commented out "non_eq" terms were incorrectly included, as I though the different FF-terms of the XT/CT-states are defined wrt different energy references (due to the different equilibrium bond lengths), but it turns out that all e-phonon couplings in X-SH are defined relative to the R_eq in the neutral ground state, per Wei-Tao
 
     eigenvals, eigenvecs = get_eigen(H)
 
-    XT_characters = get_XT_characters(eigenvecs,number_excitons=10)
-    xt_populations, ict_populations, nict_populations, css_populations = divide_states(eigenvecs, 'FRZ_DIAGONALS_COULOMB.include', 'CT_DISTANCES.include')
+    XT_characters = get_XT_characters(eigenvecs, number_diabats, number_excitons, recomb)
+    xt_populations, ict_populations, nict_populations, css_populations = divide_states(eigenvecs, 'FRZ_DIAGONALS_COULOMB.include', 'CT_DISTANCES.include', recomb)
 
-    eigenstate_transition_elements = eigenstate_transition_dipoles(eigenvecs, dipole_array, number_excitons=10)
+    eigenstate_transition_elements = eigenstate_transition_dipoles(eigenvecs, dipole_array, number_excitons, recomb)
     eigenstate_transition_elements = np.sum(eigenstate_transition_elements**2, axis=1)
 
     #PASSING ALL ADIABATS' TRANSITION DIPOLES INTO AN ARRAY
@@ -116,5 +117,5 @@ energy_sorted_transition_dipole_array = transition_dipole_array[:,energy_sorted_
 #energy_sorted_dominant_dipoles = dominant_dipole_array[:, energy_sorted_indices]
 energy_sorted_character_array = eigen_character_array[:, energy_sorted_indices]
 
-np.savetxt('transition_dipoles_rel-to-neutral-e5_2xCT.txt', energy_sorted_transition_dipole_array)
-np.savetxt('eigen_characters_rel-to-neutral-e5_2xCT.txt', energy_sorted_character_array)
+np.savetxt('transition_dipoles_rel-to-neutral-physopt_shortchain_recomb.txt', energy_sorted_transition_dipole_array)
+np.savetxt('eigen_characters_rel-to-neutral-physopt_shortchain_recomb.txt', energy_sorted_character_array)

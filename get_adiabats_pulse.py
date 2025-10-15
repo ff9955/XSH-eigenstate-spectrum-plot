@@ -20,8 +20,9 @@ trajectory_list = [t for t in range(0,1000)]
 
 active_PDI_list = [6, 18, 30, 42, 54, 66, 78, 90, 102, 114]
 
-number_diabats = 60
+number_diabats = 61
 number_excitons = 10
+recomb = True
 neutral_geometry_energies = np.loadtxt('total_neutral_energies.txt')
 non_covalent_array = np.zeros(len(neutral_geometry_energies)-1)
 
@@ -64,31 +65,27 @@ for trajectory in trajectory_list:
     non_covalent_array[trajectory] = non_covalent_energy
     #taking the intermolecular interaction energy as the difference between the total and electronic X-SH energies
 
-    CT_energy = 0.086424
+    CT_energy = 0 #0.086424
     #assigning the energy of the S1 excitation (2.75eV) MINUS the XT-CT offset, since this is already accounted for in the XT site energies
 
     for index in range(len(H)):
-        if index <= 400:
-            H[index,index] = H[index,index] - (neutral_energy - non_covalent_energy) + CT_energy
-        else:
-            H[index,index] = H[index,index] - (neutral_energy - non_covalent_energy) + CT_energy
-
-            #shifting site energies such that XT site energy = S1 energy at R_eq of neutral ground state
+        H[index,index] = H[index,index] - (neutral_energy - non_covalent_energy) + CT_energy
+        #shifting site energies such that XT site energy = S1 energy at R_eq of neutral ground state
 
     eigenvals, eigenvecs = get_eigen(H)
     eigenvals = eigenvals*27211.396641307998
     #re-diagonalising and converting to meV
 
-    eigenstate_transition_elements = eigenstate_transition_dipoles(eigenvecs, dipole_array, number_excitons=10)
+    eigenstate_transition_elements = eigenstate_transition_dipoles(eigenvecs, dipole_array, number_excitons, recomb)
     eigenstate_transition_elements = np.sum(eigenstate_transition_elements**2, axis=1)
 
-    photon_probabilities = gaussian_pulse(eigenvals, 3150, 47.52) 
+    photon_probabilities = gaussian_pulse(eigenvals, 3140, 47.52) 
     normalised_transition_elements = eigenstate_transition_elements/np.sum(eigenstate_transition_elements)
 
     adiabat_probabilities = photon_probabilities*normalised_transition_elements
     #getting the excitation probability of all given adiabats by multiplying the squared dipole moments by the photon probability distribution
 
-    XT_characters = get_XT_characters(eigenvecs,10)
+    XT_characters = get_XT_characters(eigenvecs, number_diabats, number_excitons, recomb)
    
     chosen_adiabat_array[0, counter: counter + number_diabats] = XT_characters
     chosen_adiabat_array[1, counter: counter + number_diabats] = adiabat_probabilities

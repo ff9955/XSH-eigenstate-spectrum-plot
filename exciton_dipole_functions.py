@@ -166,7 +166,7 @@ def get_eigen(matrix):
 
     return eigenvalues, eigenvectors
 
-def eigenstate_transition_dipoles(eigenvector_array, dipole_moment_array, number_excitons):
+def eigenstate_transition_dipoles(eigenvector_array, dipole_moment_array, number_excitons, recomb):
     '''
     function that calculates the transition dipole moments of all eigenvectors resulting from a given Hamiltonian, using the dipole moments of individual molecules, and the expansion coefficients of the eigenvector components
 
@@ -182,8 +182,11 @@ def eigenstate_transition_dipoles(eigenvector_array, dipole_moment_array, number
 
     for index, vector  in enumerate(eigenvector_transpose):
 
-        exciton_vector = vector[-number_excitons:]
-       #ignoring all diabats apart from the excitons
+        if not recomb:
+            exciton_vector = vector[-number_excitons:]
+        else:
+            exciton_vector = vector[-number_excitons-1:-1]
+        #ignoring all diabats apart from the excitons
 
         column_vector = exciton_vector[:, np.newaxis]
         #re-defining the exciton coefficient array as a column vector
@@ -199,25 +202,28 @@ def eigenstate_transition_dipoles(eigenvector_array, dipole_moment_array, number
 
     return eigenstate_dipole_elements
 
-def get_XT_characters(eigenvector_array, number_excitons):
+def get_XT_characters(eigenvector_array, number_diabats, number_excitons, recomb):
     '''
     Function that calculates the relative populations of excitonic basis states for each eigenvector in the array of eigenvectors you must pass in
 
-    Input: eigenvector_array: 2D array where each column corresponds to an eigenvector of a matrix; number_excitons: int, the number of excitonic basis states that make up your electronic wavefunction
+    Input: eigenvector_array: 2D array where each column corresponds to an eigenvector of a matrix; number_excitons: int, the number of excitonic basis states that make up your electronic wavefunction; number_diabats: int, total number of diabatic states in X-SH state space; recomb: bool, whether or not neutral GS has been included in state space
 
     Output: 1D array of floats, where each element corresponds to the relative excitonic population of an eigenstate; the order of populations in this row vector is the same as the order of eigenvector columns in the array you pass in
     '''
 
     eigenvec_transpose = eigenvector_array.T
-    number_eigenstates = len(eigenvector_array)
 
-    eigenstate_XT_characters = np.zeros(number_eigenstates)
+    eigenstate_XT_characters = np.zeros(number_diabats)
     #initialising output array, whose length has to be equal to the number of eigenvectors in the input array
     
     for index, vector in enumerate(eigenvec_transpose):
 
-        exciton_vector = vector[-number_excitons:]
+        if not recomb:
+            exciton_vector = vector[-number_excitons:]
         #the last N elements of the eigenvector column correspond to the N excitonic basis states, due to my assumption of the structure of the Hamiltonian that is passed in
+        else:
+            #ignoring final element which corresponds to neutral GS
+            exciton_vector = vector[-number_excitons-1:-1]
 
         XT_character = np.sum(exciton_vector**2)
         #square each expansion coefficient to get the population
@@ -225,7 +231,7 @@ def get_XT_characters(eigenvector_array, number_excitons):
 
     return eigenstate_XT_characters
 
-def divide_states(eigenvectors, coulomb_barrier_path, ct_distance_path):
+def divide_states(eigenvectors, coulomb_barrier_path, ct_distance_path, recomb):
     '''
     Function that divides the diabatic populations of each eigenvector in an array into iCT, niCT, CSS and XT components and returns of the sum of these diabatic subsets' populations for all eigenvectors in the array
     '''
@@ -237,13 +243,17 @@ def divide_states(eigenvectors, coulomb_barrier_path, ct_distance_path):
     coulomb_array = xyz_parser(coulomb_barrier_path, 3)
     coulomb_array = vector_float(coulomb_array[:,-1])
 
-    number_excitons = len(eigenvectors) - len(coulomb_array)
+    number_CT_states = len(coulomb_array)
+    if not recomb:
+        number_excitons = len(eigenvectors) - number_CT_states
+    else:
+        number_excitons = len(eigenvectors) - 1 - number_CT_states
 
     distance_array = xyz_parser(ct_distance_path, 3)
     distance_array = vector_float(distance_array[:,-1])
 
     #getting XT population of each vector: M_XT states after CT-block in each column
-    exciton_population = np.sum(diabatic_populations[-number_excitons,:], axis=0)
+    exciton_population = np.sum(diabatic_populations[number_CT_states:number_CT_states+number_excitons,:], axis=0)
 
     #iCT states will have lowest possible values of coulomb barrier
     sorted_coulomb = np.sort(coulomb_array)
@@ -259,6 +269,11 @@ def divide_states(eigenvectors, coulomb_barrier_path, ct_distance_path):
     css_population = np.sum(diabatic_populations[css_indices,:], axis=0)
     #therefore niCT is just the remainder of the 3 aforementioned state types
     
-    nict_population = 1 - exciton_population - ict_population - css_population
+    #GS electronic population is last element of each column if recombination is activated
+    if recomb:
+        gs_population = diabatic_populations[-1,:]
+        nict_population = 1 - exciton_population - ict_population - css_population - gs_population
+    else:
+        nict_population = 1 - exciton_population - ict_population - css_population
 
     return exciton_population, ict_population, nict_population, css_population

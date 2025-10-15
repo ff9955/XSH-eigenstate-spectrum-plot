@@ -1,5 +1,5 @@
 import numpy as np
-from xsh_analysis import *
+from xsh_analysis_functions import *
 from file_parsers import *
 
 #this is a python script that calculates the transition dipole moment of the eigenstates of an FE or FE-CT Hamiltonian, by taking the linear combination of the diabatic state coefficients of each eigenstate, multiplied by the dipole moment of the molecule to which the diabatic state corresponds. The Hamiltonian must be specified manually either by writing out or loading in an array, or you can build the FE Hamiltonian (but not FE-CT) by using the function inside this file. The molecular dipoles are calculated by the sum of products of atomic positions and TRESP charges, so you need to read in the TrESP charges from an external file by using the get_TRESP_charges function below. You also need to read in a position file of the molecules involved in the Hamiltonian, which should be in the format of a standard xyz file. Instructions on how to use the functions is included in their comments and docstrings, and example is also given below.
@@ -183,7 +183,7 @@ def eigenstate_transition_dipoles(eigenvector_array, dipole_moment_array, number
     for index, vector  in enumerate(eigenvector_transpose):
 
         exciton_vector = vector[-number_excitons:]
-        #ignoring all diabats apart from the excitons, which are the final "number_excitons" elements of the eigenvector
+       #ignoring all diabats apart from the excitons
 
         column_vector = exciton_vector[:, np.newaxis]
         #re-defining the exciton coefficient array as a column vector
@@ -209,8 +209,8 @@ def get_XT_characters(eigenvector_array, number_excitons):
     '''
 
     eigenvec_transpose = eigenvector_array.T
-
     number_eigenstates = len(eigenvector_array)
+
     eigenstate_XT_characters = np.zeros(number_eigenstates)
     #initialising output array, whose length has to be equal to the number of eigenvectors in the input array
     
@@ -218,8 +218,47 @@ def get_XT_characters(eigenvector_array, number_excitons):
 
         exciton_vector = vector[-number_excitons:]
         #the last N elements of the eigenvector column correspond to the N excitonic basis states, due to my assumption of the structure of the Hamiltonian that is passed in
+
         XT_character = np.sum(exciton_vector**2)
         #square each expansion coefficient to get the population
         eigenstate_XT_characters[index] = XT_character
 
     return eigenstate_XT_characters
+
+def divide_states(eigenvectors, coulomb_barrier_path, ct_distance_path):
+    '''
+    Function that divides the diabatic populations of each eigenvector in an array into iCT, niCT, CSS and XT components and returns of the sum of these diabatic subsets' populations for all eigenvectors in the array
+    '''
+
+    diabatic_populations = eigenvectors**2
+
+    vector_float = np.vectorize(float)
+    #reading coulomb barrier elements and associated e-h distances into 1D np arrays
+    coulomb_array = xyz_parser(coulomb_barrier_path, 3)
+    coulomb_array = vector_float(coulomb_array[:,-1])
+
+    number_excitons = len(eigenvectors) - len(coulomb_array)
+
+    distance_array = xyz_parser(ct_distance_path, 3)
+    distance_array = vector_float(distance_array[:,-1])
+
+    #getting XT population of each vector: M_XT states after CT-block in each column
+    exciton_population = np.sum(diabatic_populations[-number_excitons,:], axis=0)
+
+    #iCT states will have lowest possible values of coulomb barrier
+    sorted_coulomb = np.sort(coulomb_array)
+    ict_indices = np.where(coulomb_array == sorted_coulomb[0])[0]
+    #get these indices from barrier minima, apply to the eigenvector array columns
+    ict_population = np.sum(diabatic_populations[ict_indices,:], axis=0)
+
+    #CSS = all diabats to the right of the barrier peak
+    barrier_max = np.where(coulomb_array == max(coulomb_array))[0][0]
+    max_distance = distance_array[barrier_max]
+    css_indices = np.where(distance_array > max_distance)[0]
+
+    css_population = np.sum(diabatic_populations[css_indices,:], axis=0)
+    #therefore niCT is just the remainder of the 3 aforementioned state types
+    
+    nict_population = 1 - exciton_population - ict_population - css_population
+
+    return exciton_population, ict_population, nict_population, css_population

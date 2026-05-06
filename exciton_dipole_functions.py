@@ -2,7 +2,7 @@ import numpy as np
 from xsh_analysis_functions import *
 from file_parsers import *
 
-#this is a python script that calculates the transition dipole moment of the eigenstates of an FE or FE-CT Hamiltonian, by taking the linear combination of the diabatic state coefficients of each eigenstate, multiplied by the dipole moment of the molecule to which the diabatic state corresponds. The Hamiltonian must be specified manually either by writing out or loading in an array, or you can build the FE Hamiltonian (but not FE-CT) by using the function inside this file. The molecular dipoles are calculated by the sum of products of atomic positions and TRESP charges, so you need to read in the TrESP charges from an external file by using the get_TRESP_charges function below. You also need to read in a position file of the molecules involved in the Hamiltonian, which should be in the format of a standard xyz file. Instructions on how to use the functions is included in their comments and docstrings, and example is also given below.
+#this is a python module used calculate the transition dipole moment of the eigenstates of an FE or FE-CT Hamiltonian, by taking the linear combination of the diabatic state coefficients of each eigenstate, multiplied by the dipole moment of the molecule to which the diabatic state corresponds. The Hamiltonian must be specified manually either by writing out or loading in an array, or you can build the FE Hamiltonian (but not FE-CT) by using the function inside this file. The molecular dipoles are calculated by the sum of products of atomic positions and TRESP charges, so you need to read in the TrESP charges from an external file by using the get_TRESP_charges function below. You also need to read in a position file of the molecules involved in the Hamiltonian, which should be in the format of a standard xyz file. Instructions on how to use the functions is included in their comments and docstrings, and example is also given below.
 
 def get_TRESP_charges(file_path):
     '''
@@ -145,7 +145,7 @@ def build_excitonic_H(tresp_array, molecule_coordinate_list, eV=False):
     H = H + H.T
     #the Hamiltonian matrix is symmetric, so I have only calculated the upper triangle, and I am assigining the (identical but reflected) lower triangle by adding the transposes together
 
-    if eV == True: H = H*27.2   #possible conversion to eV from atomic units
+    if eV == True: H = H*27.211   #possible conversion to eV from atomic units
 
     return H
 
